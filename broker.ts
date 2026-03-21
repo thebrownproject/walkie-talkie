@@ -71,9 +71,19 @@ Bun.serve({
     const path = url.pathname
     const method = req.method
 
+    // Parse JSON body when present
+    let body: Record<string, unknown> = {}
+    const contentType = req.headers.get('content-type') ?? ''
+    if ((method === 'POST' || method === 'DELETE') && contentType.includes('application/json')) {
+      try {
+        body = await req.json() as Record<string, unknown>
+      } catch {
+        return json({ error: 'invalid JSON body' }, 400)
+      }
+    }
+
     // POST /register
     if (method === 'POST' && path === '/register') {
-      const body = await req.json() as Record<string, unknown>
       const name = body.name as string
       if (!name) return json({ error: 'name required' }, 400)
       if (!/^[\w\-]{1,64}$/.test(name)) return json({ error: 'name must be 1-64 word chars or hyphens' }, 400)
@@ -111,7 +121,6 @@ Bun.serve({
 
     // POST /send
     if (method === 'POST' && path === '/send') {
-      const body = await req.json() as Record<string, unknown>
       const from = body.from as string
       const to = body.to as string
       const content = body.content as string
@@ -134,7 +143,6 @@ Bun.serve({
 
     // POST /broadcast
     if (method === 'POST' && path === '/broadcast') {
-      const body = await req.json() as Record<string, unknown>
       const from = body.from as string
       const content = body.content as string
 
@@ -169,7 +177,6 @@ Bun.serve({
 
     // POST /subscribe
     if (method === 'POST' && path === '/subscribe') {
-      const body = await req.json() as Record<string, unknown>
       const name = body.name as string
       const topic = body.topic as string
 
@@ -187,7 +194,6 @@ Bun.serve({
 
     // DELETE /subscribe
     if (method === 'DELETE' && path === '/subscribe') {
-      const body = await req.json() as Record<string, unknown>
       const name = body.name as string
       const topic = body.topic as string
 
@@ -203,7 +209,6 @@ Bun.serve({
 
     // POST /publish
     if (method === 'POST' && path === '/publish') {
-      const body = await req.json() as Record<string, unknown>
       const from = body.from as string
       const topic = body.topic as string
       const content = body.content as string
