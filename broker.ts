@@ -47,11 +47,30 @@ function json(data: unknown, status = 200) {
   })
 }
 
+function capInbox(messages: Message[]) {
+  if (messages.length > INBOX_CAP) messages.splice(0, messages.length - INBOX_CAP)
+  return messages
+}
+
+function setInbox(name: string, messages: Message[]) {
+  inboxes.set(name, capInbox(messages))
+}
+
 function enqueue(name: string, msg: Message) {
   const inbox = inboxes.get(name)
   if (!inbox) return
   inbox.push(msg)
-  if (inbox.length > INBOX_CAP) inbox.splice(0, inbox.length - INBOX_CAP)
+  capInbox(inbox)
+}
+
+function replaceSession(name: string, session: Session) {
+  const preservedMessages = capInbox([
+    ...(inFlight.get(name)?.messages ?? []),
+    ...(inboxes.get(name) ?? []),
+  ])
+  sessions.set(name, session)
+  setInbox(name, preservedMessages)
+  inFlight.delete(name)
 }
 
 function unregister(name: string) {
@@ -100,18 +119,24 @@ Bun.serve({
       if (sessions.has(name) && !body.force) {
         return json({ error: 'name taken, use force: true to re-register' }, 409)
       }
-      if (sessions.has(name)) unregister(name)
 
       const now = new Date().toISOString()
-      sessions.set(name, {
+      const session = {
         name,
         role: (body.role as string) ?? '',
         runtime: (body.runtime as string) ?? 'unknown',
         joined_at: now,
         last_seen: now,
-        subscriptions: [],
-      })
-      inboxes.set(name, [])
+        subscriptions: sessions.get(name)?.subscriptions ?? [],
+      }
+
+      if (sessions.has(name)) {
+        replaceSession(name, session)
+      } else {
+        sessions.set(name, session)
+        setInbox(name, [])
+      }
+
       return json({ registered: name })
     }
 
@@ -184,7 +209,7 @@ Bun.serve({
       if (existing && Date.now() - existing.polled_at > IN_FLIGHT_TIMEOUT) {
         const inbox = inboxes.get(name) ?? []
         // Prepend timed-out messages so they get delivered first
-        inboxes.set(name, [...existing.messages, ...inbox])
+        setInbox(name, [...existing.messages, ...inbox])
         inFlight.delete(name)
         process.stderr.write(`broker: returned ${existing.messages.length} timed-out in-flight message(s) to "${name}" inbox\n`)
       }
@@ -247,12 +272,12 @@ Bun.serve({
         if (batch.messages.length === 0) inFlight.delete(name)
 
         const inbox = inboxes.get(name) ?? []
-        inboxes.set(name, [...toReturn, ...inbox])
+        setInbox(name, [...toReturn, ...inbox])
         return json({ returned: toReturn.length })
       } else {
         // Full nack: return all in-flight messages to inbox
         const inbox = inboxes.get(name) ?? []
-        inboxes.set(name, [...batch.messages, ...inbox])
+        setInbox(name, [...batch.messages, ...inbox])
         const count = batch.messages.length
         inFlight.delete(name)
         return json({ returned: count })

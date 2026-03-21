@@ -8,21 +8,27 @@ You have MCP tools for all walkie-talkie operations. Use ONLY these MCP tools. D
 
 ### Joining
 
-Use the `join` MCP tool to register this session with a name and role. You MUST do this before sending or receiving messages.
+Use the `join` MCP tool to register this session with a name, role, and optional channels. You MUST do this before sending or receiving messages.
 
 ### Sending Messages
 
-Use the `send` MCP tool to message a specific session, or `broadcast` to message all sessions.
+- `send` - message a specific session
+- `broadcast` - message all sessions
+- `publish` - message all subscribers of a channel
 
 ### Receiving Messages
 
 Messages from other sessions arrive automatically as `<channel source="walkie-talkie" from="...">` tags. You do not need to poll - they appear in real-time.
 
-### Other Tools
+### Channels
 
-- `list_sessions` - see who's online
-- `subscribe` - subscribe to a channel
-- `publish` - publish to a channel
+Channels are group frequencies. Subscribe to receive targeted messages.
+
+- `subscribe` - tune into a channel
+- `unsubscribe` - leave a channel
+- `publish` - send to all channel subscribers
+
+You can also subscribe to channels when joining: `join(name, role, channels: ["my-project"])`.
 
 ## MCP Tools Reference
 
@@ -31,9 +37,10 @@ Messages from other sessions arrive automatically as `<channel source="walkie-ta
 | `join` | Register with a name, role, and optional channels. MUST be called first. |
 | `send` | Send message to a named session (`to`, `text`, optional `reply_to`) |
 | `broadcast` | Send message to all sessions (`text`) |
-| `list_sessions` | List connected sessions and roles |
-| `subscribe` | Subscribe to a channel |
-| `publish` | Publish to a channel |
+| `list_sessions` | List connected sessions, roles, and channels |
+| `subscribe` | Subscribe to a channel (`channel`) |
+| `unsubscribe` | Unsubscribe from a channel (`channel`) |
+| `publish` | Publish to a channel (`channel`, `text`) |
 
 ## Rules
 

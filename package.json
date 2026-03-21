@@ -25,6 +25,16 @@
     "walkie-talkie"
   ],
   "author": "Fraser Brown",
+  "files": [
+    "broker.ts",
+    "server.ts",
+    "package.json",
+    "CLAUDE.md",
+    "README.md",
+    ".mcp.json",
+    ".claude-plugin/",
+    "skills/"
+  ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0"
   }

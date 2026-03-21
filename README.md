@@ -121,19 +121,26 @@ Works with Codex, scripts, cron jobs, Python, or anything that can make HTTP req
 ## Event Bus
 
 Walkie-Talkie doubles as a lightweight event bus. Any script can publish events that your Claude agents receive in real-time.
+Each publisher must register its sender name before sending messages.
 
 **Git hook** — notify agents when code is committed:
 ```bash
 # .git/hooks/post-commit
 MSG=$(git log -1 --pretty=format:"%h %s")
+curl -s -X POST localhost:9900/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"git","role":"post-commit hook","runtime":"script","force":true}'
 curl -s -X POST localhost:9900/publish \
   -H "Content-Type: application/json" \
-  -d "{\"from\":\"git\",\"topic\":\"commits\",\"content\":\"New commit: $MSG\"}"
+  -d "{\"from\":\"git\",\"channel\":\"commits\",\"content\":\"New commit: $MSG\"}"
 ```
 
 **Test watcher** — broadcast test results:
 ```bash
 RESULT=$(bun test 2>&1 | tail -5)
+curl -s -X POST localhost:9900/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"test-runner","role":"test watcher","runtime":"script","force":true}'
 curl -s -X POST localhost:9900/broadcast \
   -H "Content-Type: application/json" \
   -d "{\"from\":\"test-runner\",\"content\":\"$RESULT\"}"
@@ -141,9 +148,12 @@ curl -s -X POST localhost:9900/broadcast \
 
 **Deploy monitor** — publish deployment status:
 ```bash
+curl -s -X POST localhost:9900/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"deploy-bot","role":"deploy monitor","runtime":"script","force":true}'
 curl -s -X POST localhost:9900/publish \
   -H "Content-Type: application/json" \
-  -d '{"from":"deploy-bot","topic":"deploys","content":"v2.3.1 deployed to staging"}'
+  -d '{"from":"deploy-bot","channel":"deploys","content":"v2.3.1 deployed to staging"}'
 ```
 
 ## Reliability
@@ -152,7 +162,7 @@ Messages are delivered reliably with an ack/nack protocol:
 
 - Messages move to in-flight state when polled (not deleted)
 - Server confirms delivery with `/ack` or returns failed messages with `/nack`
-- Failed notifications are retried 3 times with exponential backoff
+- Failed notifications are retried with a bounded exponential backoff budget
 - 10-second safety timeout returns un-acked messages to the inbox
 - Sessions auto-unregister on exit (immediate cleanup, no stale ghosts)
 

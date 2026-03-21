@@ -23,7 +23,7 @@ A local message broker + channel plugin that lets any AI coding session:
 1. **Register** — announce itself with a name and role
 2. **Discover** — see what other sessions are online
 3. **Message** — send direct messages or broadcast to all
-4. **Subscribe** — listen to topic-based channels
+4. **Subscribe** — listen to channels for scoped coordination
 5. **Respond** — reply to messages from other sessions (bidirectional)
 
 Runtime-agnostic. If it can make HTTP requests, it can join the network.
@@ -43,7 +43,7 @@ Runtime-agnostic. If it can make HTTP requests, it can join the network.
 | Tool | What it does | Gap |
 |------|-------------|-----|
 | Agent Teams (Claude Code) | One session spawns teammates, file-based mailbox | Locked to one project, lead must spawn others, no cross-runtime |
-| Postal MCP | SQLite message queue between agents | No discovery, no topics, no registry |
+| Postal MCP | SQLite message queue between agents | No discovery, no channels, no registry |
 | Paperclip | Full org chart, budgets, governance | Way too heavy for "let my terminals talk" |
 | Superset / cmux / Amux | Manage and visualise multiple sessions | Sessions still can't communicate |
 | Conductor | GitHub-native task orchestration | Tied to GitHub Issues, not lightweight messaging |
@@ -63,7 +63,7 @@ Runtime-agnostic. If it can make HTTP requests, it can join the network.
 │  │  role        │  │  inbox/backend   │  │
 │  │  runtime     │  │  inbox/tests     │  │
 │  │  joined_at   │  │                  │  │
-│  │  last_seen   │  │  topics/         │  │
+│  │  last_seen   │  │  channels/       │  │
 │  │  subscriptions│ │    api-changes   │  │
 │  └─────────────┘  │    deploys        │  │
 │                    └──────────────────┘  │
@@ -94,14 +94,14 @@ The only difference from Telegram: instead of grammy polling Telegram's getUpdat
 
 ### Components
 
-#### 1. Broker (`broker/server.ts`)
+#### 1. Broker (`broker.ts`)
 
 Standalone Bun HTTP server. Runs independently of any coding session. Manages the registry and message routing.
 
 **State:**
 - In-memory registry of connected sessions
 - Per-session message inbox (array of pending messages)
-- Topic subscriptions (map of topic -> subscriber names)
+- Channel subscriptions (map of channel -> subscriber names)
 - Heartbeat tracking for stale session cleanup
 
 **Endpoints:**
@@ -113,9 +113,9 @@ GET    /registry               List all active sessions
 POST   /send                   Send message to a specific session
 POST   /broadcast              Send message to all sessions (excludes sender)
 GET    /poll/:name             Poll for new messages (returns immediately)
-POST   /subscribe              Subscribe to a topic
-DELETE /subscribe              Unsubscribe from a topic
-POST   /publish                Publish to a topic (routes to subscribers' inboxes)
+POST   /subscribe              Subscribe to a channel
+DELETE /subscribe              Unsubscribe from a channel
+POST   /publish                Publish to a channel (routes to subscribers' inboxes)
 GET    /health                 Broker health check
 ```
 
@@ -129,16 +129,16 @@ interface Session {
   runtime: string        // "claude-code", "codex", "cursor", "script"
   joined_at: string      // ISO timestamp
   last_seen: string      // Updated on each poll
-  subscriptions: string[] // Topic subscriptions
+  subscriptions: string[] // Channel subscriptions
 }
 
 // Message
 interface Message {
   id: string             // crypto.randomUUID()
   from: string           // Sender session name (must be registered)
-  to: string | null      // Recipient name, null for broadcast/topic
+  to: string | null      // Recipient name, null for broadcast/channel
   content: string        // Message body
-  topic?: string         // If published to a topic
+  channel?: string       // If published to a channel
   timestamp: string      // ISO timestamp
   reply_to?: string      // Message ID this is replying to
 }
@@ -155,15 +155,15 @@ interface Health {
 **Behaviour:**
 - Sessions that haven't polled in 60 seconds are marked stale
 - Sessions that haven't polled in 5 minutes are automatically unregistered (inbox dropped)
-- Broker starts on port 9900 by default (configurable via `--port`)
+- Broker starts on port 9900 by default (configurable via `WALKIE_TALKIE_PORT`)
 - Messages persist in inbox until polled (max 100 per session, FIFO overflow)
 - Broker logs to stderr, not stdout
 - `POST /register` with an existing name and `force: true` evicts the stale session and re-registers (handles crash/reconnect)
 - `POST /send` validates that `from` is a registered session (rejects spoofed senders)
 - `POST /broadcast` excludes sender from delivery (sessions don't receive their own broadcasts)
-- `POST /publish` routes to topic subscribers' inboxes (same as broadcast but scoped to topic)
+- `POST /publish` routes to channel subscribers' inboxes (same as broadcast but scoped to channels)
 
-**Note on broadcast vs topics:** Broadcast delivers to all sessions. Topics deliver to subscribers only. Both use the same inbox mechanism. If you find yourself subscribing all sessions to a topic, just use broadcast. Topics are for scoped coordination (e.g. only frontend and backend care about "api-changes", tests don't).
+**Note on broadcast vs channels:** Broadcast delivers to all sessions. Channels deliver to subscribers only. Both use the same inbox mechanism. If you find yourself subscribing all sessions to a channel, just use broadcast. Channels are for scoped coordination (e.g. only frontend and backend care about "api-changes", tests don't).
 
 #### 2. Channel Plugin (`plugin/`)
 
@@ -199,7 +199,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js'
 
 const BROKER = process.env.WALKIE_TALKIE_BROKER ?? 'http://127.0.0.1:9900'
-const NAME = process.env.WALKIE_TALKIE_NAME ?? `session-${Date.now()}`
+let NAME = process.env.WALKIE_TALKIE_NAME ?? `session-${Date.now()}`
 const ROLE = process.env.WALKIE_TALKIE_ROLE ?? ''
 
 const mcp = new Server(
@@ -215,13 +215,13 @@ const mcp = new Server(
   },
 )
 
-// ... tool handlers (send, broadcast, list_sessions, subscribe, publish) ...
+// ... tool handlers (join, send, broadcast, list_sessions, subscribe, publish) ...
 
 await mcp.connect(new StdioServerTransport())
 
-// Register with broker (retry up to 10 times on failure)
+// Register with broker (retry up to 3 times on failure when a name is preset)
 let registered = false
-for (let i = 0; i < 10; i++) {
+for (let i = 0; i < 3; i++) {
   try {
     await fetch(`${BROKER}/register`, {
       method: 'POST',
@@ -252,7 +252,7 @@ setInterval(async () => {
             source: 'walkie-talkie',
             from: msg.from,
             message_id: msg.id,
-            ...(msg.topic ? { topic: msg.topic } : {}),
+            ...(msg.channel ? { channel: msg.channel } : {}),
             ...(msg.reply_to ? { reply_to: msg.reply_to } : {}),
           },
         },
@@ -304,23 +304,23 @@ tools: [
   },
   {
     name: 'subscribe',
-    description: 'Subscribe to a topic for targeted updates',
+    description: 'Subscribe to a channel for targeted updates',
     inputSchema: {
       properties: {
-        topic: { type: 'string', description: 'Topic name to subscribe to' }
+        channel: { type: 'string', description: 'Channel name to subscribe to' }
       },
-      required: ['topic']
+      required: ['channel']
     }
   },
   {
     name: 'publish',
-    description: 'Publish a message to a topic',
+    description: 'Publish a message to a channel',
     inputSchema: {
       properties: {
-        topic: { type: 'string', description: 'Topic to publish to' },
+        channel: { type: 'string', description: 'Channel to publish to' },
         text: { type: 'string', description: 'Message content' }
       },
-      required: ['topic', 'text']
+      required: ['channel', 'text']
     }
   }
 ]
@@ -390,15 +390,15 @@ Backend Claude recognises it's a backend issue and starts fixing
 Frontend Claude notes the issue but continues its work
 ```
 
-### Example 3: Topic-based coordination
+### Example 3: Channel-based coordination
 
 ```
-Backend subscribes to "deploy" topic
-Frontend subscribes to "deploy" topic
+Backend subscribes to "deploy" channel
+Frontend subscribes to "deploy" channel
 (Tests does not subscribe)
 
 DevOps script publishes:
-  POST /publish { from: "deploy-bot", topic: "deploy", content: "v2.3.1 deployed to staging" }
+  POST /publish { from: "deploy-bot", channel: "deploy", content: "v2.3.1 deployed to staging" }
     ↓
 Frontend and backend receive the notification (they're subscribed)
 Tests does not receive it (not subscribed)
@@ -479,11 +479,11 @@ walkie-talkie/
   - Message IDs via crypto.randomUUID()
   - Inbox cap: 100 messages per session (drop oldest on overflow)
 
-- [ ] **T4: Implement topic pub/sub**
-  - Map<string, Set<string>> for topic -> subscriber names
-  - POST /subscribe — add session to topic
-  - DELETE /subscribe — remove session from topic
-  - POST /publish — validate `from` is registered, route message to all topic subscribers' inboxes
+- [ ] **T4: Implement channel pub/sub**
+  - Map<string, Set<string>> for channel -> subscriber names
+  - POST /subscribe — add session to a channel
+  - DELETE /subscribe — remove session from a channel
+  - POST /publish — validate `from` is registered, route message to all channel subscribers' inboxes
   - Auto-unsubscribe on session unregister
 
 - [ ] **T5: Implement heartbeat and cleanup**
@@ -497,7 +497,7 @@ walkie-talkie/
     - Register two sessions, verify /registry
     - Send message between them, verify /poll returns it
     - Test broadcast (verify sender excluded)
-    - Test topic subscribe/publish
+    - Test channel subscribe/publish
     - Test force re-register
     - Test /health response
     - Verify stale cleanup (register, don't poll, wait for cleanup)
@@ -609,5 +609,5 @@ walkie-talkie/
 1. **No message persistence across broker restarts** — in-memory only in Phase 1-4. Messages in flight are lost if broker dies.
 2. **No turn-taking protocol** — two AI sessions messaging each other asynchronously can have messages cross in transit. The reply_to field helps but doesn't solve interleaved conversations.
 3. **Notifications during active response** — if Claude is mid-task when a message arrives, it may buffer until the current turn completes. This is how Telegram works too and is acceptable.
-4. **No message acknowledgment** — messages are cleared from inbox on poll. If the plugin crashes between poll and processing, messages are lost. Acceptable for v1.
+4. **No message persistence across client crashes** — if a session crashes and is force re-registered or the broker restarts, in-flight recovery is still best-effort rather than durable storage.
 5. **Single developer scope** — localhost only, no multi-user, no auth. By design.
