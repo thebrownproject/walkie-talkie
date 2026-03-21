@@ -38,6 +38,7 @@ You can also subscribe to channels when joining: `join(name, role, channels: ["m
 | `send` | Send message to a named session (`to`, `text`, optional `reply_to`) |
 | `broadcast` | Send message to all sessions (`text`) |
 | `list_sessions` | List connected sessions, roles, and channels |
+| `update_role` | Update this session's role description (`role`) |
 | `subscribe` | Subscribe to a channel (`channel`) |
 | `unsubscribe` | Unsubscribe from a channel (`channel`) |
 | `publish` | Publish to a channel (`channel`, `text`) |
