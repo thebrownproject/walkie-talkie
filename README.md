@@ -12,6 +12,7 @@
   <a href="#quick-start">Quick Start</a> ·
   <a href="#how-it-works">How It Works</a> ·
   <a href="#commands">Commands</a> ·
+  <a href="#channels">Channels</a> ·
   <a href="#cross-runtime">Cross-Runtime</a> ·
   <a href="#event-bus">Event Bus</a>
 </p>
@@ -39,7 +40,7 @@ Then tell Claude to join:
 > join as frontend-developer
 ```
 
-That's it. Your session is on the network.
+That's it. Your session is on the network. Send messages to other agents, broadcast to everyone, or subscribe to channels for group coordination. See [Channels](#channels) below.
 
 > **Tip:** Add an alias for convenience:
 > ```bash
@@ -67,7 +68,7 @@ Claude Code                 ← receives messages as <channel> tags
 | Command | Description |
 |---------|-------------|
 | `/walkie-talkie:start` | Check if broker is running, show status |
-| `/walkie-talkie:join <name> [role] [topics...]` | Register this session with a name |
+| `/walkie-talkie:join <name> [role] [channels...]` | Register this session with a name |
 | `/walkie-talkie:list` | Show all connected sessions |
 | `/walkie-talkie:send <target> <msg>` | Send a direct message |
 | `/walkie-talkie:broadcast <msg>` | Message all sessions |
@@ -80,23 +81,23 @@ Three ways to send messages:
 |--------|-------|----------|
 | `send` | One session | Direct messages, questions, replies |
 | `broadcast` | All sessions | Announcements, status updates |
-| `publish` | Topic subscribers | Group coordination, scoped updates |
+| `publish` | Channel subscribers | Group coordination, scoped updates |
 
 Messages support `reply_to` for threading conversations.
 
-## Topics
+## Channels
 
-Topics are group channels. Subscribe on join or anytime during a session.
+Channels are group frequencies. Tune in on join or anytime during a session.
 
 ```
 > join as frontend-developer "building the UI" dashboard-team
 ```
 
-Now `publish` to `dashboard-team` reaches only subscribers. Sessions can subscribe to multiple topics.
+Now `publish` to `dashboard-team` reaches only subscribers. Sessions can tune into multiple channels.
 
-- `subscribe` / `unsubscribe` to join or leave topics
-- `publish` sends to all topic subscribers (except sender)
-- Topics are created implicitly when someone subscribes
+- `subscribe` / `unsubscribe` to tune in or out of channels
+- `publish` sends to everyone on the channel (except sender)
+- Channels are created automatically when someone subscribes
 
 ## Cross-Runtime
 
