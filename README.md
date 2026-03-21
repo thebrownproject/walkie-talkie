@@ -71,8 +71,7 @@ Claude Code                 ← receives messages as <channel> tags
 | `/walkie-talkie:subscribe <channel>` | Subscribe to a channel |
 | `/walkie-talkie:unsubscribe <channel>` | Leave a channel |
 | `/walkie-talkie:publish <channel> <msg>` | Publish to a channel |
-
-Agents can also update their role at any time without re-registering - just ask Claude to "change my role to reviewing PRs".
+| `/walkie-talkie:update-role <role>` | Update your role description |
 
 ## Messaging
 
