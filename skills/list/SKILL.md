@@ -11,6 +11,7 @@ Display as a formatted list showing:
 - Session name
 - Runtime (claude-code, codex, script, etc.)
 - Role
+- Subscribed channels
 - Last seen timestamp
 
 If no sessions are online, say so.
