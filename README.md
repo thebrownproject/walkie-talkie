@@ -37,7 +37,7 @@ claude --dangerously-load-development-channels plugin:walkie-talkie@walkie-talki
 Then tell Claude to join:
 
 ```
-> join as frontend "building the UI" my-project
+> join as frontend-developer "building the UI" my-project
 ```
 
 That's it. Your session is on the network, subscribed to the `my-project` topic.
@@ -90,7 +90,7 @@ Messages support `reply_to` for threading conversations.
 Topics are group channels. Subscribe on join or anytime during a session.
 
 ```
-> join as frontend-dev "frontend developer" dashboard-team
+> join as frontend-developer "building the UI" dashboard-team
 ```
 
 Now `publish` to `dashboard-team` reaches only subscribers. Sessions can subscribe to multiple topics.
