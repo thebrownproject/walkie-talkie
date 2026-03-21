@@ -227,17 +227,21 @@ mcp.setRequestHandler(CallToolRequestSchema, async req => {
 // Connect to Claude Code
 await mcp.connect(new StdioServerTransport())
 
-// Try to register with broker on startup (non-blocking)
-// If broker isn't running yet, the join tool can register later
-for (let i = 0; i < 3; i++) {
-  try {
-    await registerWithBroker(NAME, ROLE)
-    break
-  } catch {}
-  await new Promise(r => setTimeout(r, 2000))
-}
-if (!registered) {
-  process.stderr.write(`walkie-talkie: broker not available at ${BROKER}, use the join tool to connect later\n`)
+// Only auto-register if WALKIE_TALKIE_NAME was explicitly set
+// Otherwise, wait for the user to call the join tool
+if (process.env.WALKIE_TALKIE_NAME) {
+  for (let i = 0; i < 3; i++) {
+    try {
+      await registerWithBroker(NAME, ROLE)
+      break
+    } catch {}
+    await new Promise(r => setTimeout(r, 2000))
+  }
+  if (!registered) {
+    process.stderr.write(`walkie-talkie: broker not available at ${BROKER}, use the join tool to connect later\n`)
+  }
+} else {
+  process.stderr.write(`walkie-talkie: waiting for join -- use the join tool or set WALKIE_TALKIE_NAME\n`)
 }
 
 // Poll loop -- self-scheduling to prevent overlapping requests
