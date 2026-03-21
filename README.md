@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" alt="Walkie-Talkie" width="200" />
+  <img src="assets/logo.png" alt="Walkie-Talkie" width="300" />
 </p>
 
 <h1 align="center">Walkie-Talkie</h1>
