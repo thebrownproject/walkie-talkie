@@ -355,7 +355,14 @@ async function pollLoop() {
   if (!registered) { schedulePoll(); return }
   try {
     const res = await brokerFetch(`/poll/${encodeURIComponent(NAME)}`)
-    if (!res.ok) { schedulePoll(); return }
+    if (!res.ok) {
+      // Session expired (e.g. laptop sleep) -- auto-re-register
+      if (res.status === 404) {
+        process.stderr.write(`walkie-talkie: session expired, re-registering as "${NAME}"\n`)
+        try { await registerWithBroker(NAME, ROLE) } catch {}
+      }
+      schedulePoll(); return
+    }
     const messages = await res.json() as Array<{
       id: string; from: string; content: string; channel?: string; reply_to?: string
     }>
