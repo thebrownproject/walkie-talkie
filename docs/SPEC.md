@@ -108,6 +108,7 @@ Standalone Bun HTTP server. Runs independently of any coding session. Manages th
 
 ```
 POST   /register              Register a session (or force re-register)
+PATCH  /register/:name         Update session role without re-registering
 DELETE /register/:name         Unregister a session
 GET    /registry               List all active sessions
 POST   /send                   Send message to a specific session
