@@ -21,19 +21,19 @@ Messages from other sessions arrive automatically as `<channel source="walkie-ta
 ### Other Tools
 
 - `list_sessions` - see who's online
-- `subscribe` - subscribe to a topic
-- `publish` - publish to a topic
+- `subscribe` - subscribe to a channel
+- `publish` - publish to a channel
 
 ## MCP Tools Reference
 
 | Tool | Purpose |
 |------|---------|
-| `join` | Register with a name, role, and optional topics. MUST be called first. |
+| `join` | Register with a name, role, and optional channels. MUST be called first. |
 | `send` | Send message to a named session (`to`, `text`, optional `reply_to`) |
 | `broadcast` | Send message to all sessions (`text`) |
 | `list_sessions` | List connected sessions and roles |
-| `subscribe` | Subscribe to a topic |
-| `publish` | Publish to a topic |
+| `subscribe` | Subscribe to a channel |
+| `publish` | Publish to a channel |
 
 ## Rules
 

@@ -24,14 +24,14 @@ interface Message {
   from: string
   to: string | null
   content: string
-  topic?: string
+  channel?: string
   timestamp: string
   reply_to?: string
 }
 
 const sessions = new Map<string, Session>()
 const inboxes = new Map<string, Message[]>()
-const topics = new Map<string, Set<string>>()
+const channels = new Map<string, Set<string>>()
 
 // In-flight messages: messages that have been polled but not yet acknowledged
 interface InFlightBatch {
@@ -58,7 +58,7 @@ function unregister(name: string) {
   sessions.delete(name)
   inboxes.delete(name)
   inFlight.delete(name)
-  for (const subs of topics.values()) subs.delete(name)
+  for (const subs of channels.values()) subs.delete(name)
 }
 
 // Stale session cleanup
@@ -262,45 +262,45 @@ Bun.serve({
     // POST /subscribe
     if (method === 'POST' && path === '/subscribe') {
       const name = body.name as string
-      const topic = body.topic as string
+      const channel = body.channel as string
 
-      if (!name || !topic) return json({ error: 'name, topic required' }, 400)
+      if (!name || !channel) return json({ error: 'name, channel required' }, 400)
       if (!sessions.has(name)) return json({ error: 'not registered' }, 404)
 
-      if (!topics.has(topic)) topics.set(topic, new Set())
-      topics.get(topic)!.add(name)
+      if (!channels.has(channel)) channels.set(channel, new Set())
+      channels.get(channel)!.add(name)
 
       const session = sessions.get(name)!
-      if (!session.subscriptions.includes(topic)) session.subscriptions.push(topic)
+      if (!session.subscriptions.includes(channel)) session.subscriptions.push(channel)
 
-      return json({ subscribed: { name, topic } })
+      return json({ subscribed: { name, channel } })
     }
 
     // DELETE /subscribe
     if (method === 'DELETE' && path === '/subscribe') {
       const name = body.name as string
-      const topic = body.topic as string
+      const channel = body.channel as string
 
-      if (!name || !topic) return json({ error: 'name, topic required' }, 400)
+      if (!name || !channel) return json({ error: 'name, channel required' }, 400)
       if (!sessions.has(name)) return json({ error: 'not registered' }, 404)
 
-      topics.get(topic)?.delete(name)
+      channels.get(channel)?.delete(name)
       const session = sessions.get(name)
-      if (session) session.subscriptions = session.subscriptions.filter(t => t !== topic)
+      if (session) session.subscriptions = session.subscriptions.filter(t => t !== channel)
 
-      return json({ unsubscribed: { name, topic } })
+      return json({ unsubscribed: { name, channel } })
     }
 
     // POST /publish
     if (method === 'POST' && path === '/publish') {
       const from = body.from as string
-      const topic = body.topic as string
+      const channel = body.channel as string
       const content = body.content as string
 
-      if (!from || !topic || !content) return json({ error: 'from, topic, content required' }, 400)
+      if (!from || !channel || !content) return json({ error: 'from, channel, content required' }, 400)
       if (!sessions.has(from)) return json({ error: `sender "${from}" not registered` }, 403)
 
-      const subscribers = topics.get(topic)
+      const subscribers = channels.get(channel)
       if (!subscribers || subscribers.size === 0) return json({ published: 0 })
 
       const msg: Message = {
@@ -308,7 +308,7 @@ Bun.serve({
         from,
         to: null,
         content,
-        topic,
+        channel,
         timestamp: new Date().toISOString(),
       }
 
@@ -319,7 +319,7 @@ Bun.serve({
           count++
         }
       }
-      return json({ published: count, topic })
+      return json({ published: count, channel })
     }
 
     // GET /health

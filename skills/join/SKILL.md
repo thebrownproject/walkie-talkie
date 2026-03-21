@@ -15,15 +15,15 @@ You MUST use the `join` MCP tool (plugin:walkie-talkie:walkie-talkie). Do NOT us
 
 - First argument: session name (e.g. "frontend", "backend", "tests")
 - Second argument (optional): role description (e.g. "building React components")
-- Additional arguments (optional): topic names to subscribe to (e.g. "project-a" "deploys")
+- Additional arguments (optional): channel names to subscribe to (e.g. "project-a" "deploys")
 
 ## Steps
 
 1. Call the `join` MCP tool (NOT curl, NOT bash) with:
    - `name`: session name from first argument
    - `role`: role description from second argument (or empty string)
-   - `topics`: any remaining arguments as topic names to subscribe to
+   - `channels`: any remaining arguments as channel names to subscribe to
 
 2. Call the `list_sessions` MCP tool to show who else is online.
 
-3. Display confirmation: "Joined as NAME. N other sessions online." Include topics if subscribed.
+3. Display confirmation: "Joined as NAME. N other sessions online." Include channels if subscribed.

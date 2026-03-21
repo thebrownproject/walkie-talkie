@@ -28,7 +28,7 @@ const mcp = new Server(
     instructions: [
       'Messages from other coding sessions arrive as <channel source="walkie-talkie" from="..." message_id="...">.',
       'Reply with the send tool, passing the sender name as "to".',
-      'Use the join tool first to set your session name, role, and optionally subscribe to topics.',
+      'Use the join tool first to set your session name, role, and optionally subscribe to channels.',
       'Use list_sessions to see who else is online.',
       'Use broadcast to message all sessions at once.',
     ].join('\n'),
@@ -70,16 +70,16 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
       name: 'join',
-      description: 'Join the walkie-talkie network with a name, role, and optional topics',
+      description: 'Join the walkie-talkie network with a name, role, and optional channels',
       inputSchema: {
         type: 'object' as const,
         properties: {
           name: { type: 'string', description: 'Session name (e.g. "frontend", "backend", "tests")' },
           role: { type: 'string', description: 'What this session is doing (e.g. "building React components")' },
-          topics: {
+          channels: {
             type: 'array' as const,
             items: { type: 'string' },
-            description: 'Topics/channels to subscribe to (e.g. ["project-a", "deploys"])',
+            description: 'Channels to subscribe to (e.g. ["project-a", "deploys"])',
           },
         },
         required: ['name'],
@@ -116,25 +116,25 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'subscribe',
-      description: 'Subscribe to a topic for targeted updates',
+      description: 'Subscribe to a channel for targeted updates',
       inputSchema: {
         type: 'object' as const,
         properties: {
-          topic: { type: 'string', description: 'Topic name' },
+          channel: { type: 'string', description: 'Channel name' },
         },
-        required: ['topic'],
+        required: ['channel'],
       },
     },
     {
       name: 'publish',
-      description: 'Publish a message to a topic',
+      description: 'Publish a message to a channel',
       inputSchema: {
         type: 'object' as const,
         properties: {
-          topic: { type: 'string', description: 'Topic to publish to' },
+          channel: { type: 'string', description: 'Channel to publish to' },
           text: { type: 'string', description: 'Message content' },
         },
-        required: ['topic', 'text'],
+        required: ['channel', 'text'],
       },
     },
   ],
@@ -146,15 +146,15 @@ mcp.setRequestHandler(CallToolRequestSchema, async req => {
     switch (req.params.name) {
       case 'join': {
         await registerWithBroker(args.name as string, (args.role as string) ?? '')
-        const topics = args.topics as string[] | undefined
+        const channels = args.channels as string[] | undefined
         const subscribed: string[] = []
-        if (topics?.length) {
-          for (const topic of topics) {
+        if (channels?.length) {
+          for (const channel of channels) {
             const res = await brokerFetch('/subscribe', {
               method: 'POST',
-              body: JSON.stringify({ name: NAME, topic }),
+              body: JSON.stringify({ name: NAME, channel }),
             })
-            if (res.ok) subscribed.push(topic)
+            if (res.ok) subscribed.push(channel)
           }
         }
         const parts = [`joined as "${NAME}"`]
@@ -192,7 +192,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async req => {
         const lines = Object.values(data.sessions).map(s => {
           const parts = [`${s.name} (${s.runtime})`]
           if (s.role) parts.push(s.role)
-          if (s.subscriptions?.length) parts.push(`topics: ${s.subscriptions.join(', ')}`)
+          if (s.subscriptions?.length) parts.push(`channels: ${s.subscriptions.join(', ')}`)
           parts.push(`last seen: ${s.last_seen}`)
           return parts.join(' | ')
         })
@@ -202,21 +202,21 @@ mcp.setRequestHandler(CallToolRequestSchema, async req => {
         if (!registered) throw new Error('not joined yet, use the join tool first')
         const res = await brokerFetch('/subscribe', {
           method: 'POST',
-          body: JSON.stringify({ name: NAME, topic: args.topic }),
+          body: JSON.stringify({ name: NAME, channel: args.channel }),
         })
         const data = await res.json() as Record<string, unknown>
         if (!res.ok) throw new Error(data.error as string)
-        return { content: [{ type: 'text', text: `subscribed to "${args.topic}"` }] }
+        return { content: [{ type: 'text', text: `subscribed to "${args.channel}"` }] }
       }
       case 'publish': {
         if (!registered) throw new Error('not joined yet, use the join tool first')
         const res = await brokerFetch('/publish', {
           method: 'POST',
-          body: JSON.stringify({ from: NAME, topic: args.topic, content: args.text }),
+          body: JSON.stringify({ from: NAME, channel: args.channel, content: args.text }),
         })
         const data = await res.json() as Record<string, unknown>
         if (!res.ok) throw new Error(data.error as string)
-        return { content: [{ type: 'text', text: `published to "${args.topic}" (${data.published} recipients)` }] }
+        return { content: [{ type: 'text', text: `published to "${args.channel}" (${data.published} recipients)` }] }
       }
       default:
         return { content: [{ type: 'text', text: `unknown tool: ${req.params.name}` }], isError: true }
@@ -260,7 +260,7 @@ if (process.env.WALKIE_TALKIE_NAME) {
 
 // Deliver a single notification with retry + exponential backoff
 async function deliverNotification(msg: {
-  id: string; from: string; content: string; topic?: string; reply_to?: string
+  id: string; from: string; content: string; channel?: string; reply_to?: string
 }): Promise<boolean> {
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
@@ -272,7 +272,7 @@ async function deliverNotification(msg: {
             source: 'walkie-talkie',
             from: msg.from,
             message_id: msg.id,
-            ...(msg.topic ? { topic: msg.topic } : {}),
+            ...(msg.channel ? { channel: msg.channel } : {}),
             ...(msg.reply_to ? { reply_to: msg.reply_to } : {}),
           },
         },
@@ -298,7 +298,7 @@ async function pollLoop() {
     const res = await brokerFetch(`/poll/${encodeURIComponent(NAME)}`)
     if (!res.ok) { setTimeout(pollLoop, POLL_INTERVAL); return }
     const messages = await res.json() as Array<{
-      id: string; from: string; content: string; topic?: string; reply_to?: string
+      id: string; from: string; content: string; channel?: string; reply_to?: string
     }>
     if (messages.length === 0) { setTimeout(pollLoop, POLL_INTERVAL); return }
 
