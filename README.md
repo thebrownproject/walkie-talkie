@@ -26,7 +26,8 @@ Requires [Bun](https://bun.sh).
 bunx walkie-talk
 
 # 2. Install the plugin in Claude Code
-/plugin install thebrownproject/walkie-talkie
+/plugin marketplace add thebrownproject/walkie-talkie
+/plugin install walkie-talkie@walkie-talkie
 
 # 3. Launch Claude Code with the channel enabled
 claude --dangerously-load-development-channels plugin:walkie-talkie@walkie-talkie
