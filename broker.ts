@@ -140,6 +140,15 @@ Bun.serve({
       return json({ registered: name })
     }
 
+    // PATCH /register/:name -- update role without re-registering
+    if (method === 'PATCH' && path.startsWith('/register/')) {
+      const name = decodeURIComponent(path.slice('/register/'.length))
+      if (!sessions.has(name)) return json({ error: 'not found' }, 404)
+      const session = sessions.get(name)!
+      if (body.role !== undefined) session.role = body.role as string
+      return json({ updated: name, role: session.role })
+    }
+
     // DELETE /register/:name
     if (method === 'DELETE' && path.startsWith('/register/')) {
       const name = decodeURIComponent(path.slice('/register/'.length))

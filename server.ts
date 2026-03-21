@@ -130,6 +130,17 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
       inputSchema: { type: 'object' as const, properties: {}, required: [] },
     },
     {
+      name: 'update_role',
+      description: 'Update this session\'s role description without re-registering',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          role: { type: 'string', description: 'New role description' },
+        },
+        required: ['role'],
+      },
+    },
+    {
       name: 'subscribe',
       description: 'Subscribe to a channel for targeted updates',
       inputSchema: {
@@ -223,6 +234,17 @@ mcp.setRequestHandler(CallToolRequestSchema, async req => {
           return parts.join(' | ')
         })
         return { content: [{ type: 'text', text: lines.length ? lines.join('\n') : 'no sessions online' }] }
+      }
+      case 'update_role': {
+        if (!registered) throw new Error('not joined yet, use the join tool first')
+        const res = await brokerFetch(`/register/${encodeURIComponent(NAME)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ role: args.role }),
+        })
+        const data = await res.json() as Record<string, unknown>
+        if (!res.ok) throw new Error(data.error as string)
+        ROLE = args.role as string
+        return { content: [{ type: 'text', text: `role updated to "${args.role}"` }] }
       }
       case 'subscribe': {
         if (!registered) throw new Error('not joined yet, use the join tool first')
