@@ -16,6 +16,9 @@ const BROKER = process.env.WALKIE_TALKIE_BROKER ?? 'http://127.0.0.1:9900'
 let NAME = process.env.WALKIE_TALKIE_NAME ?? `session-${Date.now()}`
 let ROLE = process.env.WALKIE_TALKIE_ROLE ?? ''
 const POLL_INTERVAL = 2000
+const NOTIFICATION_STAGGER_MS = 150 // delay between rapid-fire notifications
+const MAX_RETRIES = 3
+const RETRY_BASE_MS = 500 // exponential backoff: 500, 1000, 2000
 let registered = false
 
 const mcp = new Server(
@@ -244,7 +247,40 @@ if (process.env.WALKIE_TALKIE_NAME) {
   process.stderr.write(`walkie-talkie: waiting for join -- use the join tool or set WALKIE_TALKIE_NAME\n`)
 }
 
+// Deliver a single notification with retry + exponential backoff
+async function deliverNotification(msg: {
+  id: string; from: string; content: string; topic?: string; reply_to?: string
+}): Promise<boolean> {
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      await mcp.notification({
+        method: 'notifications/claude/channel',
+        params: {
+          content: msg.content,
+          meta: {
+            source: 'walkie-talkie',
+            from: msg.from,
+            message_id: msg.id,
+            ...(msg.topic ? { topic: msg.topic } : {}),
+            ...(msg.reply_to ? { reply_to: msg.reply_to } : {}),
+          },
+        },
+      })
+      process.stderr.write(`walkie-talkie: delivered ${msg.id} (attempt ${attempt + 1})\n`)
+      return true
+    } catch (err) {
+      const delay = RETRY_BASE_MS * Math.pow(2, attempt)
+      process.stderr.write(`walkie-talkie: notification failed for ${msg.id} (attempt ${attempt + 1}/${MAX_RETRIES}): ${err}\n`)
+      if (attempt < MAX_RETRIES - 1) {
+        await new Promise(r => setTimeout(r, delay))
+      }
+    }
+  }
+  return false
+}
+
 // Poll loop -- self-scheduling to prevent overlapping requests
+// Uses ack/nack protocol so the broker retains messages until confirmed delivered
 async function pollLoop() {
   if (!registered) { setTimeout(pollLoop, POLL_INTERVAL); return }
   try {
@@ -253,29 +289,49 @@ async function pollLoop() {
     const messages = await res.json() as Array<{
       id: string; from: string; content: string; topic?: string; reply_to?: string
     }>
-    if (messages.length > 0) {
-      process.stderr.write(`walkie-talkie: polled ${messages.length} message(s) for "${NAME}"\n`)
-    }
-    for (const msg of messages) {
-      process.stderr.write(`walkie-talkie: delivering message ${msg.id} from "${msg.from}": ${msg.content.slice(0, 80)}\n`)
-      try {
-        await mcp.notification({
-          method: 'notifications/claude/channel',
-          params: {
-            content: msg.content,
-            meta: {
-              source: 'walkie-talkie',
-              from: msg.from,
-              message_id: msg.id,
-              ...(msg.topic ? { topic: msg.topic } : {}),
-              ...(msg.reply_to ? { reply_to: msg.reply_to } : {}),
-            },
-          },
-        })
-        process.stderr.write(`walkie-talkie: notification sent successfully for ${msg.id}\n`)
-      } catch (err) {
-        process.stderr.write(`walkie-talkie: failed to deliver message ${msg.id}: ${err}\n`)
+    if (messages.length === 0) { setTimeout(pollLoop, POLL_INTERVAL); return }
+
+    process.stderr.write(`walkie-talkie: polled ${messages.length} message(s) for "${NAME}"\n`)
+
+    const delivered: string[] = []
+    const failed: string[] = []
+
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i]
+      process.stderr.write(`walkie-talkie: delivering ${msg.id} from "${msg.from}": ${msg.content.slice(0, 80)}\n`)
+
+      const ok = await deliverNotification(msg)
+      if (ok) {
+        delivered.push(msg.id)
+      } else {
+        failed.push(msg.id)
       }
+
+      // Stagger between notifications to avoid overwhelming the transport
+      if (i < messages.length - 1) {
+        await new Promise(r => setTimeout(r, NOTIFICATION_STAGGER_MS))
+      }
+    }
+
+    // Acknowledge successfully delivered messages
+    if (delivered.length > 0) {
+      await brokerFetch(`/ack/${encodeURIComponent(NAME)}`, {
+        method: 'POST',
+        body: JSON.stringify({ message_ids: delivered }),
+      }).catch(err => {
+        process.stderr.write(`walkie-talkie: ack failed: ${err}\n`)
+      })
+    }
+
+    // Nack failed messages so they return to the inbox for next poll
+    if (failed.length > 0) {
+      process.stderr.write(`walkie-talkie: nacking ${failed.length} failed message(s)\n`)
+      await brokerFetch(`/nack/${encodeURIComponent(NAME)}`, {
+        method: 'POST',
+        body: JSON.stringify({ message_ids: failed }),
+      }).catch(err => {
+        process.stderr.write(`walkie-talkie: nack failed: ${err}\n`)
+      })
     }
   } catch {
     // broker unreachable -- silently retry

@@ -7,6 +7,7 @@
 const PORT = parseInt(process.env.WALKIE_TALKIE_PORT ?? '9900', 10)
 const STALE_TIMEOUT = 5 * 60 * 1000 // 5 minutes
 const INBOX_CAP = 100
+const IN_FLIGHT_TIMEOUT = 10_000 // 10 seconds before un-acked messages return to inbox
 const startedAt = Date.now()
 
 interface Session {
@@ -32,6 +33,13 @@ const sessions = new Map<string, Session>()
 const inboxes = new Map<string, Message[]>()
 const topics = new Map<string, Set<string>>()
 
+// In-flight messages: messages that have been polled but not yet acknowledged
+interface InFlightBatch {
+  messages: Message[]
+  polled_at: number
+}
+const inFlight = new Map<string, InFlightBatch>()
+
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -49,6 +57,7 @@ function enqueue(name: string, msg: Message) {
 function unregister(name: string) {
   sessions.delete(name)
   inboxes.delete(name)
+  inFlight.delete(name)
   for (const subs of topics.values()) subs.delete(name)
 }
 
@@ -170,9 +179,84 @@ Bun.serve({
       const session = sessions.get(name)!
       session.last_seen = new Date().toISOString()
 
+      // Return any timed-out in-flight messages back to the inbox
+      const existing = inFlight.get(name)
+      if (existing && Date.now() - existing.polled_at > IN_FLIGHT_TIMEOUT) {
+        const inbox = inboxes.get(name) ?? []
+        // Prepend timed-out messages so they get delivered first
+        inboxes.set(name, [...existing.messages, ...inbox])
+        inFlight.delete(name)
+        process.stderr.write(`broker: returned ${existing.messages.length} timed-out in-flight message(s) to "${name}" inbox\n`)
+      }
+
+      // If there are still un-acked in-flight messages, don't send more
+      if (inFlight.has(name)) {
+        return json([])
+      }
+
       const inbox = inboxes.get(name) ?? []
+      if (inbox.length === 0) return json([])
+
+      // Move messages to in-flight
+      inFlight.set(name, { messages: [...inbox], polled_at: Date.now() })
       inboxes.set(name, [])
       return json(inbox)
+    }
+
+    // POST /ack/:name -- acknowledge successful delivery of polled messages
+    if (method === 'POST' && path.startsWith('/ack/')) {
+      const name = decodeURIComponent(path.slice('/ack/'.length))
+      if (!sessions.has(name)) return json({ error: 'not registered' }, 404)
+
+      const acked = body.message_ids as string[] | undefined
+      const batch = inFlight.get(name)
+      if (!batch) return json({ acked: 0 })
+
+      if (acked && acked.length > 0) {
+        // Partial ack: remove only the acknowledged messages
+        const ackedSet = new Set(acked)
+        const remaining = batch.messages.filter(m => !ackedSet.has(m.id))
+        if (remaining.length === 0) {
+          inFlight.delete(name)
+        } else {
+          batch.messages = remaining
+        }
+        return json({ acked: acked.length, remaining: remaining.length })
+      } else {
+        // Full ack: clear entire in-flight batch
+        const count = batch.messages.length
+        inFlight.delete(name)
+        return json({ acked: count })
+      }
+    }
+
+    // POST /nack/:name -- negative ack, return messages to inbox for retry
+    if (method === 'POST' && path.startsWith('/nack/')) {
+      const name = decodeURIComponent(path.slice('/nack/'.length))
+      if (!sessions.has(name)) return json({ error: 'not registered' }, 404)
+
+      const nacked = body.message_ids as string[] | undefined
+      const batch = inFlight.get(name)
+      if (!batch) return json({ returned: 0 })
+
+      if (nacked && nacked.length > 0) {
+        // Partial nack: return specific messages to inbox
+        const nackedSet = new Set(nacked)
+        const toReturn = batch.messages.filter(m => nackedSet.has(m.id))
+        batch.messages = batch.messages.filter(m => !nackedSet.has(m.id))
+        if (batch.messages.length === 0) inFlight.delete(name)
+
+        const inbox = inboxes.get(name) ?? []
+        inboxes.set(name, [...toReturn, ...inbox])
+        return json({ returned: toReturn.length })
+      } else {
+        // Full nack: return all in-flight messages to inbox
+        const inbox = inboxes.get(name) ?? []
+        inboxes.set(name, [...batch.messages, ...inbox])
+        const count = batch.messages.length
+        inFlight.delete(name)
+        return json({ returned: count })
+      }
     }
 
     // POST /subscribe
@@ -242,11 +326,14 @@ Bun.serve({
     if (method === 'GET' && path === '/health') {
       let totalQueued = 0
       for (const inbox of inboxes.values()) totalQueued += inbox.length
+      let totalInFlight = 0
+      for (const batch of inFlight.values()) totalInFlight += batch.messages.length
       return json({
         status: 'ok',
         uptime_seconds: Math.floor((Date.now() - startedAt) / 1000),
         session_count: sessions.size,
         total_queued_messages: totalQueued,
+        total_in_flight_messages: totalInFlight,
       })
     }
 
