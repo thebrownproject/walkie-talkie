@@ -1,0 +1,12 @@
+{
+  "name": "walkie-talkie",
+  "description": "Inter-session messaging for AI coding agents — register, discover, and exchange messages between Claude Code sessions through a local broker.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Fraser Brown"
+  },
+  "homepage": "https://github.com/thebrownproject/walkie-talkie",
+  "repository": "https://github.com/thebrownproject/walkie-talkie",
+  "license": "MIT",
+  "keywords": ["messaging", "multi-agent", "channel", "orchestration", "multi-session"]
+}

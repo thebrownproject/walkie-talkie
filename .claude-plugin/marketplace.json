@@ -1,0 +1,19 @@
+{
+  "name": "walkie-talkie",
+  "description": "Inter-session messaging for AI coding agents",
+  "owner": {
+    "name": "Fraser Brown",
+    "email": "fraserbrown@live.com"
+  },
+  "plugins": [
+    {
+      "name": "walkie-talkie",
+      "description": "Register, discover, and exchange messages between Claude Code sessions through a local broker.",
+      "version": "1.0.0",
+      "source": "./",
+      "author": {
+        "name": "Fraser Brown"
+      }
+    }
+  ]
+}
