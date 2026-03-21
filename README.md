@@ -20,13 +20,17 @@
 ## Quick Start
 
 ```bash
-# 1. Install the plugin
+# 1. Clone the repo
+git clone https://github.com/thebrownproject/walkie-talkie.git
+cd walkie-talkie && bun install
+
+# 2. Install the plugin in Claude Code
 /plugin install thebrownproject/walkie-talkie
 
-# 2. Start the broker
-bun /path/to/walkie-talkie/broker.ts &
+# 3. Start the broker
+bun broker.ts &
 
-# 3. Launch Claude Code with the channel enabled
+# 4. Launch Claude Code with the channel enabled
 claude --dangerously-load-development-channels plugin:walkie-talkie@walkie-talkie
 ```
 
@@ -37,6 +41,12 @@ Then tell Claude to join:
 ```
 
 That's it. Your session is on the network.
+
+> **Tip:** Add an alias for convenience:
+> ```bash
+> alias wt-broker="bun ~/path/to/walkie-talkie/broker.ts &"
+> alias wt="claude --dangerously-load-development-channels plugin:walkie-talkie@walkie-talkie"
+> ```
 
 ## How It Works
 
