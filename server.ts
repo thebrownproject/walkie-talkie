@@ -141,6 +141,17 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
       },
     },
     {
+      name: 'unsubscribe',
+      description: 'Unsubscribe from a channel',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          channel: { type: 'string', description: 'Channel name' },
+        },
+        required: ['channel'],
+      },
+    },
+    {
       name: 'publish',
       description: 'Publish a message to a channel',
       inputSchema: {
@@ -222,6 +233,16 @@ mcp.setRequestHandler(CallToolRequestSchema, async req => {
         const data = await res.json() as Record<string, unknown>
         if (!res.ok) throw new Error(data.error as string)
         return { content: [{ type: 'text', text: `subscribed to "${args.channel}"` }] }
+      }
+      case 'unsubscribe': {
+        if (!registered) throw new Error('not joined yet, use the join tool first')
+        const res = await brokerFetch('/subscribe', {
+          method: 'DELETE',
+          body: JSON.stringify({ name: NAME, channel: args.channel }),
+        })
+        const data = await res.json() as Record<string, unknown>
+        if (!res.ok) throw new Error(data.error as string)
+        return { content: [{ type: 'text', text: `unsubscribed from "${args.channel}"` }] }
       }
       case 'publish': {
         if (!registered) throw new Error('not joined yet, use the join tool first')

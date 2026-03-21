@@ -1,6 +1,6 @@
 {
   "name": "walkie-talk",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Your Claude Code sessions can finally talk to each other",
   "type": "module",
   "license": "MIT",
