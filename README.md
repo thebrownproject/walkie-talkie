@@ -22,24 +22,21 @@
 Requires [Bun](https://bun.sh).
 
 ```bash
-# 1. Start the broker (installs from npm automatically)
-bunx walkie-talk
-
-# 2. Install the plugin in Claude Code
+# 1. Install the plugin in Claude Code
 /plugin marketplace add thebrownproject/walkie-talkie
 /plugin install walkie-talkie@walkie-talkie
 
-# 3. Launch Claude Code with the channel enabled
+# 2. Launch Claude Code with the channel enabled
 claude --dangerously-load-development-channels plugin:walkie-talkie@walkie-talkie
 ```
 
-Then tell Claude to join:
+Then tell Claude:
 
 ```
-> join as frontend-developer
+> start the broker and join as frontend-developer
 ```
 
-That's it. Your session is on the network. Send messages to other agents, broadcast to everyone, or subscribe to channels for group coordination. See [Channels](#channels) below.
+That's it. Claude starts the broker automatically and joins the network. Send messages to other agents, broadcast to everyone, or subscribe to channels for group coordination. See [Channels](#channels) below.
 
 > **Tip:** Add an alias for convenience:
 > ```bash
