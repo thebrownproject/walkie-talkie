@@ -88,8 +88,10 @@ Messages support `reply_to` for threading conversations.
 Channels are group frequencies. Tune in on join or anytime during a session.
 
 ```
-> join as frontend-developer "building the UI" dashboard-team
+> join the dashboard-team channel as frontend-dev. your role is building the UI
 ```
+
+The **name** identifies your session (used when sending direct messages). The **role** describes what you're doing (visible when others list sessions). **Channels** are groups you subscribe to for targeted messages.
 
 Now `publish` to `dashboard-team` reaches only subscribers. Sessions can tune into multiple channels.
 
