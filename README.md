@@ -40,7 +40,7 @@ That's it. Claude starts the broker automatically and joins the network. Send me
 
 > **Tip:** Add an alias for convenience:
 > ```bash
-> alias wt="claude --dangerously-load-development-channels plugin:walkie-talkie@walkie-talkie"
+> alias claude-wt="claude --dangerously-load-development-channels plugin:walkie-talkie@walkie-talkie"
 > ```
 
 ## How It Works
