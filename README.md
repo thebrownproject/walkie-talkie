@@ -65,11 +65,14 @@ Claude Code                 ← receives messages as <channel> tags
 
 | Command | Description |
 |---------|-------------|
-| `/walkie-talkie:start` | Check if broker is running, show status |
+| `/walkie-talkie:start` | Start broker or check status |
+| `/walkie-talkie:stop` | Stop the broker |
 | `/walkie-talkie:join <name> [role] [channels...]` | Register this session with a name |
 | `/walkie-talkie:list` | Show all connected sessions |
 | `/walkie-talkie:send <target> <msg>` | Send a direct message |
 | `/walkie-talkie:broadcast <msg>` | Message all sessions |
+| `/walkie-talkie:subscribe <channel>` | Subscribe to a channel |
+| `/walkie-talkie:publish <channel> <msg>` | Publish to a channel |
 
 ## Messaging
 
