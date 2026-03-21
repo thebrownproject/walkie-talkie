@@ -230,6 +230,17 @@ mcp.setRequestHandler(CallToolRequestSchema, async req => {
 // Connect to Claude Code
 await mcp.connect(new StdioServerTransport())
 
+// Clean up on exit -- unregister from broker when session closes
+function cleanup() {
+  if (!registered) return
+  // Fire-and-forget unregister (process is dying, can't await)
+  fetch(`${BROKER}/register/${encodeURIComponent(NAME)}`, { method: 'DELETE' }).catch(() => {})
+  process.stderr.write(`walkie-talkie: unregistered "${NAME}" on exit\n`)
+}
+process.on('SIGTERM', cleanup)
+process.on('SIGINT', cleanup)
+process.on('exit', cleanup)
+
 // Only auto-register if WALKIE_TALKIE_NAME was explicitly set
 // Otherwise, wait for the user to call the join tool
 if (process.env.WALKIE_TALKIE_NAME) {
