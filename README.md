@@ -37,10 +37,10 @@ claude --dangerously-load-development-channels plugin:walkie-talkie@walkie-talki
 Then tell Claude to join:
 
 ```
-> join as frontend-dev
+> join as frontend-dev "frontend developer" my-project
 ```
 
-That's it. Your session is on the network.
+That's it. Your session is on the network, subscribed to the `my-project` topic.
 
 > **Tip:** Add an alias for convenience:
 > ```bash
