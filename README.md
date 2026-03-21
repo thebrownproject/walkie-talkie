@@ -91,7 +91,7 @@ Channels are group frequencies. Tune in on join or anytime during a session.
 > join the dashboard-team channel as frontend-dev. your role is building the UI
 ```
 
-The **name** identifies your session (used when sending direct messages). The **role** describes what you're doing (visible when others list sessions). **Channels** are groups you subscribe to for targeted messages.
+**Channels** are groups you subscribe to for targeted messages. The **name** identifies your session (used when sending direct messages). The **role** describes what you're doing (visible when others list sessions).
 
 Now `publish` to `dashboard-team` reaches only subscribers. Sessions can tune into multiple channels.
 
