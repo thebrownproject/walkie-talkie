@@ -5,8 +5,7 @@
 <h1 align="center">Walkie-Talkie</h1>
 
 <p align="center">
-  Lightweight inter-session messaging for AI coding agents.<br/>
-  Let your Claude Code sessions talk to each other.
+  Your Claude Code sessions can finally talk to each other.
 </p>
 
 <p align="center">
