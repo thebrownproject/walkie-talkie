@@ -57,8 +57,11 @@ function setInbox(name: string, messages: Message[]) {
 }
 
 function enqueue(name: string, msg: Message) {
-  const inbox = inboxes.get(name)
-  if (!inbox) return
+  let inbox = inboxes.get(name)
+  if (!inbox) {
+    inbox = []
+    inboxes.set(name, inbox)
+  }
   inbox.push(msg)
   capInbox(inbox)
 }
